@@ -1,0 +1,950 @@
+#include <simplecpp>
+#include <string>
+#include <vector>
+#include <stdio.h>
+#include <stdlib.h>
+using namespace simplecpp;
+
+//movingObject.h
+#ifndef _MOVINGOBJECT_INCLUDED_
+#define _MOVINGOBJECT_INCLUDED_
+
+#include <simplecpp>
+#include <vector>
+#include <composite.h>
+#include <sprite.h>
+
+using namespace simplecpp;
+
+class MovingObject : public Sprite {
+  vector<Sprite*> parts;
+  double vx, vy;
+  double ax, ay;
+  bool paused;
+  void initMO(double argvx, double argvy, double argax, double argay, bool argpaused=true) {
+    vx=argvx; vy=argvy; ax=argax; ay=argay; paused=argpaused;
+  }
+ public:
+ MovingObject(double argvx, double argvy, double argax, double argay, bool argpaused=true)
+    : Sprite() {
+    initMO(argvx, argvy, argax, argay, argpaused);
+  }
+ MovingObject(double speed, double angle_deg, double argax, double argay, bool argpaused, bool rtheta) : Sprite() {
+   double angle_rad = angle_deg*PI/180.0;
+   double argvx = speed*cos(angle_rad);
+   double argvy = -speed*sin(angle_rad);
+   initMO(argvx, argvy, argax, argay, argpaused);
+  }
+  void set_vx(double argvx) { vx = argvx; }
+  void set_vy(double argvy) { vy = argvy; }
+  void set_ax(double argax) { ax = argax; }
+  void set_ay(double argay) { ay = argay; }
+  double getXPos();
+  double getYPos();
+  void reset_all(double argx, double argy, double speed, double angle_deg, double argax, double argay, bool argpaused, bool rtheta);
+
+  void pause() { paused = true; }
+  void unpause() { paused = false; }
+  bool isPaused() { return paused; }
+
+  void addPart(Sprite* p) {
+    parts.push_back(p);
+  }
+  void nextStep(double t);
+  void getAttachedTo(MovingObject *m);
+};
+
+#endif
+
+//MovingObject.cpp
+
+void MovingObject::nextStep(double t) {
+  if(paused) { return; }
+  //cerr << "x=" << getXPos() << ",y=" << getYPos() << endl;
+  //cerr << "vx=" << vx << ",vy=" << vy << endl;
+  //cerr << "ax=" << ax << ",ay=" << ay << endl;
+
+  for(size_t i=0; i<parts.size(); i++){
+    parts[i]->move(vx*t, vy*t);
+  }
+  vx += ax*t;
+  vy += ay*t;
+} // End MovingObject::nextStep()
+
+double MovingObject::getXPos() {
+  return (parts.size() > 0) ? parts[0]->getX() : -1;
+}
+
+double MovingObject::getYPos() {
+  return (parts.size() > 0) ? parts[0]->getY() : -1;
+}
+
+void MovingObject::reset_all(double argx, double argy, double speed, double angle_deg, double argax, double argay, bool argpaused, bool rtheta) {
+  for(size_t i=0; i<parts.size(); i++){
+    parts[i]->moveTo(argx, argy);
+  }
+  double angle_rad = angle_deg*PI/180.0;
+  double argvx = speed*cos(angle_rad);
+  double argvy = -speed*sin(angle_rad);
+  vx = argvx; vy = argvy; ax = argax; ay = argay; paused = argpaused;
+} // End MovingObject::reset_all()
+
+void MovingObject::getAttachedTo(MovingObject *m) {
+  double xpos = m->getXPos();
+  double ypos = m->getYPos();
+  for(size_t i=0; i<parts.size(); i++){
+    parts[i]->moveTo(xpos, ypos);
+  }
+  initMO(m->vx, m->vy, m->ax, m->ay, m->paused);
+}
+
+//coin.h
+#ifndef __COIN_H__
+#define __COIN_H__
+
+void display(int character, int number);
+void display(string message);
+
+class Coin : public MovingObject {
+  double coin_start_x;
+  double coin_start_y;
+  double release_speed;
+  double release_angle_deg;
+  double coin_ax;
+  double coin_ay;
+  int direction;
+  // Moving parts
+  Circle coin_circle;
+
+ public:
+ int characteristic;
+ Coin(double speed, double angle_deg, double argax, double argay, bool argpaused, bool rtheta, int direction) : MovingObject(speed, angle_deg, argax, argay, argpaused, rtheta) {
+    release_speed = speed;
+    release_angle_deg = angle_deg;
+    coin_ax = argax;
+    coin_ay = argay;
+    initCoin(direction);
+  }
+
+  void initCoin(int direction);
+  void resetCoin(int to_do, int direction);
+  int getAngle () {return release_angle_deg;}
+}; // End class Coin
+
+#endif
+//Alphabet.h
+class Alphabet : public MovingObject {
+  double Alph_start_x;
+  double Alph_start_y;
+  double release_speed;
+  double release_angle_deg;
+  double Alph_ax;
+  double Alph_ay;
+  bool stop;
+  int letter;
+  string Alph;
+
+  //Moving parts:
+  Text alphabet;
+  Rectangle r;
+
+  public:
+   Alphabet(double speed, double angle_deg, double argax, double argay, bool argpaused, bool rtheta, string name) : MovingObject(speed, angle_deg, argax, argay, argpaused, rtheta) {
+    release_speed = speed;
+    release_angle_deg = angle_deg;
+    Alph_ax = argax;
+    Alph_ay = argay;
+    initAlph(name);
+  }
+
+  void initAlph(string name);
+  void resetAlph();
+  void revealAlph(){r.setFill(0);}
+  int getLetter(){return letter;}
+  void stopAlph();
+  bool getStatus(){return stop;}
+  void setStop(){stop=1;}
+  double get_start_Y(){return Alph_start_y;}
+};
+//end of class Alphabet
+
+//lasso.h
+#ifndef __LASSO_H__
+#define __LASSO_H__
+
+//#define WINDOW_X 1200
+//#define WINDOW_Y 960
+#define WINDOW_X 800
+#define WINDOW_Y 600
+
+#define STEP_TIME 0.05
+#define LEVEL_TIME 15
+
+#define LIVES 3
+
+#define PLAY_X_START 100
+#define PLAY_Y_START 0
+#define PLAY_X_WIDTH (WINDOW_X-PLAY_X_START)
+#define PLAY_Y_HEIGHT (WINDOW_Y-100)
+
+#define LASSO_X_OFFSET 100
+#define LASSO_Y_HEIGHT 100
+#define LASSO_BAND_LENGTH LASSO_X_OFFSET
+#define LASSO_THICKNESS 5
+
+#define COIN_GAP 1
+
+#define RELEASE_ANGLE_STEP_DEG 5
+#define MIN_RELEASE_ANGLE_DEG 0
+#define INIT_RELEASE_ANGLE_DEG 30
+#define MAX_RELEASE_ANGLE_DEG (INIT_RELEASE_ANGLE_DEG+20*RELEASE_ANGLE_STEP_DEG)
+
+#define RELEASE_SPEED_STEP 20
+#define MIN_RELEASE_SPEED 0
+#define MAX_RELEASE_SPEED 400
+#define INIT_RELEASE_SPEED 200
+
+#define COIN_SPEED 300
+#define COIN_ANGLE_DEG 75
+
+#define LASSO_G 30
+#define COIN_G 160
+
+#define LASSO_SIZE 10
+#define LASSO_RADIUS 50
+#define COIN_SIZE 5
+
+class Lasso : public MovingObject {
+  double lasso_start_x;
+  double lasso_start_y;
+  double release_speed;
+  double release_angle_deg;
+  double lasso_ax;
+  double lasso_ay;
+  bool lasso_alphabets[5];
+  Alphabet *word[5];
+
+
+  // Moving parts
+  Circle lasso_circle;
+  Circle lasso_loop;
+
+  // Non-moving parts
+  Line lasso_line;
+  Line lasso_band;
+
+  // State info
+  bool lasso_looped;
+  Coin *the_coin;
+  Coin *second;
+  int num_coins;
+
+  void initLasso();
+
+ public:
+ Lasso(double speed, double angle_deg, double argax, double argay, bool argpaused, bool rtheta) : MovingObject(speed, angle_deg, argax, argay, argpaused, rtheta) {
+    release_speed = speed;
+    release_angle_deg = angle_deg;
+    lasso_ax = argax;
+    lasso_ay = argay;
+    initLasso();
+  }
+
+  void draw_lasso_band();
+  void yank(int lv, int &lives);
+  void loopit();
+  void addAngle(double angle_deg);
+  void addSpeed(double speed);
+
+  void nextStep(double t, int lv, int* lives);
+  void check_for_coin(Coin *coin);
+  void check_for_alphabet(Alphabet *alphabet);
+  int getNumCoins() { return num_coins; }
+  void decNumCoins(){num_coins--;}
+  void setNumCoins( int i){ num_coins=i;}
+  bool get_Lasso_alphabet(int index){ return lasso_alphabets[index];}
+  void set_Lasso_alphabet(int index){lasso_alphabets[index]=1;}
+  double getCircleX(){
+    int x = lasso_circle.getX();
+    return x;
+  }
+  double getCircleY(){
+    int y = lasso_circle.getY();
+    return y;
+  }
+
+}; // End class Lasso
+
+#endif
+
+//coin.h
+
+void Coin::initCoin(int direction) {
+  if(direction==0){
+  coin_start_x = 100+(PLAY_X_START+WINDOW_X)/3;
+  }
+  else if(direction==1){
+  coin_start_x = 400+(PLAY_X_START+WINDOW_X)/3;
+  }
+  coin_start_y = PLAY_Y_HEIGHT;
+  coin_circle.reset(coin_start_x, coin_start_y, COIN_SIZE);
+  coin_circle.setColor(COLOR(255,215,0));
+  coin_circle.setFill(true);
+  addPart(&coin_circle);
+  characteristic = 0;
+}
+
+void Coin::resetCoin(int to_do, int direction) {
+  double coin_speed = COIN_SPEED;
+  double coin_angle_deg;
+  if(direction==0){
+    coin_angle_deg = COIN_ANGLE_DEG;
+  }
+  else if(direction==1){
+    coin_angle_deg= 180 - COIN_ANGLE_DEG;
+  }
+  coin_ax = 0;
+  coin_ay = COIN_G;
+  bool paused = true, rtheta = true;
+  reset_all(coin_start_x, coin_start_y, coin_speed, coin_angle_deg, coin_ax, coin_ay, paused, rtheta);
+  characteristic=to_do;
+  if(characteristic !=1 && characteristic !=2 && characteristic!=3){
+    coin_circle.setColor(COLOR(255,215,0));
+    coin_circle.setFill(true);
+  }
+  else if(characteristic==1){
+   coin_circle.setColor(COLOR(0,0,0));
+   coin_circle.setFill(1);
+  }
+  else if(characteristic == 2){
+    coin_circle.setColor(COLOR(0,0,255));
+    coin_circle.setFill(1);
+  }
+  else if(characteristic == 3){
+    coin_circle.setColor(COLOR(255,0,0));
+    coin_circle.setFill(1);
+  }
+}
+
+//Alphabet.h
+
+void Alphabet::initAlph(string name){
+  Alph_start_x=250+(PLAY_X_START+WINDOW_X)/3;
+  Alph_start_y=PLAY_Y_HEIGHT-10;
+  stop=0;
+  if(name=="L"){
+    alphabet.reset(Alph_start_x,Alph_start_y,"L");
+    letter=0;
+  }
+  else if(name=="A"){
+    alphabet.reset(Alph_start_x,Alph_start_y,"A");
+    letter=1;
+  }
+  else if(name=="S"){
+     alphabet.reset(Alph_start_x,Alph_start_y,"S");
+     letter=2;
+  }
+  else if(name=="T"){
+     alphabet.reset(Alph_start_x,Alph_start_y,"S");
+     letter=3;
+  }
+  else if(name=="O"){
+     alphabet.reset(Alph_start_x,Alph_start_y,"O");
+     letter=4;
+  }
+  r.reset(Alph_start_x,Alph_start_y,5+textWidth("A"),5+textHeight());
+  r.setFill(1);
+  addPart(&alphabet);
+  addPart(&r);
+}//end of Alphabet::initAlph(name)
+
+void Alphabet::resetAlph(){
+  double alph_speed = COIN_SPEED;
+  double alph_angle_deg = 90;
+  Alph_ax = 0;
+  Alph_ay = COIN_G;
+  bool paused = true, rtheta = true;
+  r.setFill(1);
+  reset_all(Alph_start_x, Alph_start_y, alph_speed, alph_angle_deg, Alph_ax, Alph_ay, paused, rtheta);
+}//end of Alphabet::resetAlph()
+
+void Alphabet::stopAlph(){
+  stop=1;
+  r.setFill(1);
+  resetAlph();
+}//end of Alphabet::stopAlph()
+
+//lasso.cpp
+
+void Lasso::draw_lasso_band() {
+  double len = (release_speed/MAX_RELEASE_SPEED)*LASSO_BAND_LENGTH;
+  double arad = release_angle_deg*PI/180.0;
+  double xlen = len*cos(arad);
+  double ylen = len*sin(arad);
+  lasso_band.reset(lasso_start_x, lasso_start_y, (lasso_start_x-xlen), (lasso_start_y+ylen));
+  lasso_band.setThickness(LASSO_THICKNESS);
+} // End Lasso::draw_lasso_band()
+
+void Lasso::initLasso() {
+  lasso_start_x = (PLAY_X_START+LASSO_X_OFFSET);
+  lasso_start_y = (PLAY_Y_HEIGHT-LASSO_Y_HEIGHT);
+  lasso_circle.reset(lasso_start_x, lasso_start_y, LASSO_SIZE);
+  lasso_circle.setColor(COLOR(255,0,0));
+  lasso_circle.setFill(true);
+  lasso_loop.reset(lasso_start_x, lasso_start_y, LASSO_SIZE/2);
+  lasso_loop.setColor(COLOR(255,248,220));
+  lasso_loop.setFill(true);
+  addPart(&lasso_circle);
+  addPart(&lasso_loop);
+  lasso_looped = false;
+  the_coin = NULL;
+  second = NULL;
+  for(int i=0;i<5;i++){
+    word[i]=NULL;
+  }
+  num_coins = 0;
+
+  lasso_line.reset(lasso_start_x, lasso_start_y, lasso_start_x, lasso_start_y);
+  lasso_line.setColor(COLOR(255,248,220));
+
+  lasso_band.setColor(COLOR(138,43,226));
+  draw_lasso_band();
+
+  for(int i=0;i<5;i++){
+    lasso_alphabets[i]=0;
+  }
+
+} // End Lasso::initLasso()
+
+void Lasso::yank(int lv, int &lives) {
+  bool paused = true, rtheta = true;
+  reset_all(lasso_start_x, lasso_start_y, release_speed, release_angle_deg, lasso_ax, lasso_ay, paused, rtheta);
+  lasso_loop.reset(lasso_start_x, lasso_start_y, LASSO_SIZE/2);
+  lasso_loop.setFill(true);
+  lasso_looped = false;
+  if(the_coin != NULL) {
+    int i = (rand())%8;
+    if(the_coin->characteristic == 1){
+      if(num_coins>0) num_coins*=(4.0/5.0);
+      else num_coins--;
+      display("Score decreased");
+    }
+    else if(the_coin->characteristic == 3){
+      lives--;
+      display("Lost a life");
+      if(lives>0) display(1,lives);
+    }
+    else{
+      num_coins++;
+    }
+    if(lv==1) i=0;
+    if(lv==2&&(i==2 || i==3)) i=0;
+    if(lv==3&& i==3) i=0;
+    the_coin->resetCoin(i,0);
+  }
+  the_coin=NULL;
+  if(second != NULL) {
+    int i = (rand())%8;
+    if(second->characteristic == 1){
+      if(num_coins>5) num_coins*=(4.0/5.0);
+      else num_coins--;
+      display("Score decreased");
+    }
+    else if(second->characteristic == 3){
+      lives--;
+      display("Lost a life");
+      if(lives>0) display(1,lives);
+    }
+    else {
+      num_coins++;
+    }
+    if(lv==1) i=0;
+    if(lv==2&&(i==2||i==3)) i=0;
+    if(lv==3&&i==3) i=0;
+    second->resetCoin(i,1);
+  }
+  second=NULL;
+
+  for(int i=0;i<5;i++){
+    if(word[i]!=NULL){
+       if (word[i]->getStatus()==1) word[i]->stopAlph();
+    }
+  }
+} // End Lasso::yank()
+
+void Lasso::loopit() {
+  if(lasso_looped) { return; } // Already looped
+  lasso_loop.reset(getXPos(), getYPos(), LASSO_RADIUS);
+  lasso_loop.setFill(false);
+  lasso_looped = true;
+} // End Lasso::loopit()
+
+void Lasso::addAngle(double angle_deg) {
+  release_angle_deg += angle_deg;
+  if(release_angle_deg < MIN_RELEASE_ANGLE_DEG) { release_angle_deg = MIN_RELEASE_ANGLE_DEG; }
+  if(release_angle_deg > MAX_RELEASE_ANGLE_DEG) { release_angle_deg = MAX_RELEASE_ANGLE_DEG; }
+  bool paused = true, rtheta = true;
+  reset_all(lasso_start_x, lasso_start_y, release_speed, release_angle_deg, lasso_ax, lasso_ay, paused, rtheta);
+} // End Lasso::addAngle()
+
+void Lasso::addSpeed(double speed) {
+  release_speed += speed;
+  if(release_speed < MIN_RELEASE_SPEED) { release_speed = MIN_RELEASE_SPEED; }
+  if(release_speed > MAX_RELEASE_SPEED) { release_speed = MAX_RELEASE_SPEED; }
+  bool paused = true, rtheta = true;
+  reset_all(lasso_start_x, lasso_start_y, release_speed, release_angle_deg, lasso_ax, lasso_ay, paused, rtheta);
+} // End Lasso::addSpeed()
+
+void Lasso::nextStep(double stepTime, int lv, int* lives) {
+  draw_lasso_band();
+  MovingObject::nextStep(stepTime);
+  if(getYPos() > PLAY_Y_HEIGHT) { yank(lv,*lives); }
+  lasso_line.reset(lasso_start_x, lasso_start_y, getXPos(), getYPos());
+} // End Lasso::nextStep()
+
+void Lasso::check_for_coin(Coin *coinPtr) {
+  double lasso_x = getXPos();
+  double lasso_y = getYPos();
+  double coin_x = coinPtr->getXPos();
+  double coin_y = coinPtr->getYPos();
+  double xdiff = (lasso_x - coin_x);
+  double ydiff = (lasso_y - coin_y);
+  double distance = sqrt((xdiff*xdiff)+(ydiff*ydiff));
+  if(distance <= LASSO_RADIUS && coinPtr->getAngle () <90) {
+    the_coin = coinPtr;
+    the_coin->getAttachedTo(this);
+  }
+  if(distance <= LASSO_RADIUS && coinPtr->getAngle ()>90){
+     second = coinPtr;
+     second->getAttachedTo(this);
+  }
+} // End Lasso::check_for_coin()
+
+void Lasso::check_for_alphabet(Alphabet *alphPtr){
+  double lasso_x = getXPos();
+  double lasso_y = getYPos();
+  double alph_x = alphPtr->getXPos();
+  double alph_y = alphPtr->getYPos();
+  double xdiff = (lasso_x - alph_x);
+  double ydiff = (lasso_y - alph_y);
+  double distance = sqrt((xdiff*xdiff)+(ydiff*ydiff));
+  int i=alphPtr->getLetter();
+  if(distance<=LASSO_RADIUS && alph_y < alphPtr->get_start_Y()){
+    lasso_alphabets[i]=1;
+    word[i]=alphPtr;
+    alphPtr->setStop();
+    alphPtr->getAttachedTo(this);
+  }
+} //End Lasso::check_for_alphabet()
+
+//General Display Funtions
+
+void display(string message){
+  Text display(WINDOW_X/2,WINDOW_Y/2,message);
+  Rectangle r(WINDOW_X/2,WINDOW_Y/2,20+textWidth(message),20+textHeight());
+  wait(3);
+  r.setColor(COLOR(255,255,255));
+  r.setFill(1);
+} //End of display(string)
+//Displays a string for 3 seconds
+
+void display(int character, int number){
+   char text[256];
+   if(number==-1)return;
+   if(character==0){
+     sprintf(text,"LEVEL: %d",number);
+   }
+   else if(character==1){
+     sprintf(text,"LIVES: %d", number);
+   }
+   else if(character==2){
+     sprintf(text,"SCORE: %d",number);
+   }
+   Text displayed(WINDOW_X/2,WINDOW_Y/2,text);
+   displayed.setMessage(text);
+   Rectangle r(WINDOW_X/2,WINDOW_Y/2,20+textWidth("SCORE : 1000"),20+textHeight());
+   wait(3);
+   r.setColor(COLOR(255,255,255));
+   r.setFill(1);
+}//End of display(int,int)
+//Displays a string and a number for 3 seconds
+
+void help_menu (int help_status){
+  if(help_status==0){
+    Text help_heading(PLAY_X_START+0.5*textWidth("HELP")+10,30,"HELP");
+    Text coin_help(PLAY_X_START + 0.5*textWidth("Yellow coins increase score")+10, 50,"Yellow coins increase score" );
+    Text bomb_help(PLAY_X_START + 0.5*textWidth("Black bombs decrease score")+10, 70,"Black bombs decrease score");
+    Text blue_coin_help(PLAY_X_START + 0.5*textWidth("Blue coins decrease score if dropped")+10,90,"Blue coins decrease score if dropped");
+    Text poison_coin_help(PLAY_X_START + 0.5*textWidth("Red poison coins decrease lives")+10,110,"Red poison coins decrease lives");
+    Text lasso_word_help(PLAY_X_START+0.5*textWidth("Collect letters of the word LASSO to win")+10,130,"Collect letters of the word LASSO to win");
+    Text controls_help(PLAY_X_START+0.5*textWidth("Press 't' to throw,'l' to loop, 'y' to yank the Lasso")+10,150,"Press 't' to throw,'l' to loop, 'y' to yank the Lasso");
+    Text controls_help_2(PLAY_X_START+0.5*textWidth("Press '[' or ']' to control angle, = or - to control speed")+10,170,"Press '[' or ']' to control angle, = or - to control speed");
+    Text control_help_3(PLAY_X_START+0.5*textWidth("Click to exit menu, Press 'q' to quit game,'xh' for help")+10,190,"Click to exit menu, Press 'q' to quit game,'xh' for help");
+    int width_of_help_panel = textWidth("Press '[' or ']' to control angle, = or - to control speed") +30;
+    Rectangle help_panel_border(PLAY_X_START+ 0.5*( width_of_help_panel-10),110,width_of_help_panel-15,12*textHeight());
+    getClick();
+    }
+} //End of help_menu
+//Displays help menu
+
+main_program {
+
+  initCanvas("Lasso", WINDOW_X, WINDOW_Y);
+  int stepCount = 0;
+  float stepTime = STEP_TIME;
+  float runTime = -1; // sec; -ve means infinite
+  float currTime = 0;
+  float lvTime = LEVEL_TIME;
+  int remTime = lvTime;
+  int lv=1;
+  int lives = LIVES;
+  int prevcount;
+  bool victory =0;//whether the game has been won or not
+  int x = (rand())%2;//randomised variable for relewasing the letters
+  bool help_status = 0;//help menu displayed or not
+
+  string welcome("LASSO");
+  Text wlcm(WINDOW_X/2,WINDOW_Y/2,welcome);
+  string instruction("To begin game, click anywhere");
+  Text name(WINDOW_X/2,3*WINDOW_Y/4,instruction);
+  Rectangle r1(WINDOW_X/2,WINDOW_Y/2,20+textWidth("LASSO"),20+textHeight());
+  Rectangle r2(WINDOW_X/2,3*WINDOW_Y/4,30+textWidth("To begin game, click anywhere"),30+textHeight());
+  r1.setColor(COLOR(0,0,255));
+  r2.setColor(COLOR(255,255,0));
+
+  getClick();
+  r1.setColor(COLOR("white"));
+  r1.setFill(1);
+  r2.setColor(COLOR("white"));
+  r2.setFill(1);
+  display("AIM: Collect all characters and get a high score!");
+  display("Press xh for help");
+
+
+  // Draw lasso at start position
+  double release_speed = INIT_RELEASE_SPEED; // m/s
+  double release_angle_deg = INIT_RELEASE_ANGLE_DEG; // degrees
+  double lasso_ax = 0;
+  double lasso_ay = LASSO_G;
+  bool paused = true;
+  bool rtheta = true;
+  Lasso lasso(release_speed,release_angle_deg, lasso_ax, lasso_ay, paused, rtheta);
+
+  Line b1(0, PLAY_Y_HEIGHT, WINDOW_X, PLAY_Y_HEIGHT);
+  b1.setColor(COLOR(0,0,255));
+  Line b2(PLAY_X_START, 0, PLAY_X_START, WINDOW_Y);
+  b2.setColor(COLOR(0,0,255));
+
+  string msg("Cmd: _");
+  Text charPressed(PLAY_X_START+50, PLAY_Y_HEIGHT+20, msg);
+  char coinScoreStr[256];
+  sprintf(coinScoreStr, "Coins: %d", lasso.getNumCoins());
+  Text coinScore(PLAY_X_START+50, PLAY_Y_HEIGHT+50, coinScoreStr);
+  char timedisp[256];
+  sprintf(timedisp,"Time: %d",remTime);
+  Text timer(PLAY_X_START+250,PLAY_Y_HEIGHT+20,timedisp);
+  char leveldisp[256];
+  sprintf(leveldisp,"Level: %d",lv);
+  Text level(PLAY_X_START+250,PLAY_Y_HEIGHT+50,leveldisp);
+  char livesdisp[256];
+  sprintf(livesdisp,"Lives: %d",lives);
+  Text current_lives(PLAY_X_START+450,PLAY_Y_HEIGHT+20,livesdisp);
+
+  wait(1);
+
+  Text letters_lasso(PLAY_X_START+450,PLAY_Y_HEIGHT+50,"L A S S O");
+  Rectangle display_lasso(PLAY_X_START+450,PLAY_Y_HEIGHT+50,10+textWidth("L A S S O"),10+textHeight());
+  display_lasso.setColor(COLOR(255,255,255));
+  Rectangle l_lasso(PLAY_X_START+450-textWidth(" A S"),PLAY_Y_HEIGHT+50,4+textWidth("L"),2+textHeight());
+  l_lasso.setColor(COLOR(255,255,255));
+  l_lasso.setFill(1);
+  Rectangle a_lasso(PLAY_X_START+450-textWidth(" S"),PLAY_Y_HEIGHT+50,4+textWidth("L"),2+textHeight());
+  a_lasso.setColor(COLOR(255,255,255));
+  a_lasso.setFill(1);
+  Rectangle s1_lasso(PLAY_X_START+450,PLAY_Y_HEIGHT+50,4+textWidth("L"),2+textHeight());
+  s1_lasso.setColor(COLOR(255,255,255));
+  s1_lasso.setFill(1);
+  Rectangle s2_lasso(PLAY_X_START+450+textWidth(" S"),PLAY_Y_HEIGHT+50,4+textWidth("L"),2+textHeight());
+  s2_lasso.setColor(COLOR(255,255,255));
+  s2_lasso.setFill(1);
+  Rectangle o_lasso(PLAY_X_START+450+textWidth(" A S"),PLAY_Y_HEIGHT+50,4+textWidth("L"),2+textHeight());
+  o_lasso.setColor(COLOR(255,255,255));
+  o_lasso.setFill(1);
+
+  paused = true; rtheta = true;
+  double coin_speed = COIN_SPEED;
+  double coin_angle_deg = COIN_ANGLE_DEG;
+  double coin_ax = 0;
+  double coin_ay = COIN_G;
+
+  //Moving objects which can be collected
+  Coin coin(coin_speed, coin_angle_deg, coin_ax, coin_ay, paused, rtheta,0);
+  Coin secondCoin(coin_speed,180-coin_angle_deg, coin_ax, coin_ay, paused, rtheta,1);
+  Alphabet L(coin_speed,90.0, coin_ax, coin_ay, paused, rtheta,"L");
+  Alphabet A(coin_speed,90.0, coin_ax, coin_ay, paused, rtheta,"A");
+  Alphabet S(coin_speed,90.0, coin_ax, coin_ay, paused, rtheta,"S");
+  Alphabet T(coin_speed,90.0, coin_ax, coin_ay, paused, rtheta,"T");
+  Alphabet O(coin_speed,90.0, coin_ax, coin_ay, paused, rtheta,"O");
+
+  // After every COIN_GAP sec, make the coin jump
+  double last_coin_jump_end = 0;
+  display(0,lv);
+  display(1,lives);
+
+  // When t is pressed, throw lasso
+  // If lasso within range, make coin stick
+  // When y is pressed, yank lasso
+  // When l is pressed, loop lasso
+  // When q is pressed, quit
+  // When x is pressed, reset help_staatus to 0
+  // When h is pressed aftetr spome other command, display help menu
+
+  for(;;) {
+    if((runTime > 0) && (currTime > runTime)) { break; }
+
+    XEvent e;
+    bool pendingEv = checkEvent(e);
+    if(pendingEv) {
+      char c = charFromEvent(e);
+      msg[msg.length()-1] = c;
+      charPressed.setMessage(msg);
+      switch(c) {
+      case 't':
+    help_status =0;
+	lasso.unpause();
+	break;
+      case 'y':
+    prevcount=lasso.getNumCoins();
+    help_status =0;
+	lasso.yank(lv,lives);
+	if(prevcount<lasso.getNumCoins()) x=rand()%2;
+	break;
+      case 'l':
+    help_status =0;
+	lasso.loopit();
+	lasso.check_for_coin(&coin);
+	lasso.check_for_coin(&secondCoin);
+	lasso.check_for_alphabet(&L);
+	lasso.check_for_alphabet(&A);
+	lasso.check_for_alphabet(&S);
+	lasso.check_for_alphabet(&T);
+	lasso.check_for_alphabet(&O);
+	wait(STEP_TIME*5);
+	break;
+      case '[':
+    help_status =0;
+	if(lasso.isPaused()) { lasso.addAngle(-RELEASE_ANGLE_STEP_DEG);	}
+	break;
+      case ']':
+    help_status =0;
+	if(lasso.isPaused()) { lasso.addAngle(+RELEASE_ANGLE_STEP_DEG); }
+	break;
+      case '-':
+    help_status =0;
+	if(lasso.isPaused()) { lasso.addSpeed(-RELEASE_SPEED_STEP); }
+	break;
+      case '=':
+    help_status =0;
+	if(lasso.isPaused()) { lasso.addSpeed(+RELEASE_SPEED_STEP); }
+	break;
+	  case 'h':
+      help_menu(help_status);
+      help_status=1;
+    break;
+      case 'x':
+    help_status=0;
+    break;
+      case 'q':
+    display(" Quitting ");
+    display(2,lasso.getNumCoins());
+	exit(0);
+      default:
+	break;
+      }
+    }
+
+    //Yank lasso if it goes out of Window
+    if(lasso.getCircleX() > WINDOW_X || lasso.getCircleY()<0)  {
+    prevcount=lasso.getNumCoins();
+    help_status =0;
+	lasso.yank(lv,lives);
+	if(prevcount<lasso.getNumCoins()) x=rand()%2;
+    }
+
+    //Unpausing alphabets at appropriate instances
+    if(lv>4 && lv%5==0 ){
+      if(lasso.get_Lasso_alphabet(0)==0 && L.getStatus()==0 && x==1){
+        L.revealAlph();
+        L.unpause();
+      }
+      A.resetAlph();S.resetAlph();T.resetAlph();O.resetAlph();
+    }
+    if(lv>4 && lv%5==1 ){
+      if(lasso.get_Lasso_alphabet(1)==0 && A.getStatus()==0 && x==1){
+        A.revealAlph();
+        A.unpause();
+      }
+      L.resetAlph();S.resetAlph();T.resetAlph();O.resetAlph();
+    }
+    if(lv>4 && lv%5==2 ){
+      if(lasso.get_Lasso_alphabet(2)==0 && S.getStatus()==0 &&x==1){
+        S.revealAlph();
+        S.unpause();
+      }
+      A.resetAlph();L.resetAlph();T.resetAlph();O.resetAlph();
+    }
+    if(lv>4 && lv%5==3){
+      if(lasso.get_Lasso_alphabet(3)==0 &&T.getStatus()==0 &&x==1){
+        T.revealAlph();
+        T.unpause();
+      }
+      A.resetAlph();S.resetAlph();L.resetAlph();O.resetAlph();
+    }
+    if(lv>4 && lv%5==4){
+      if(lasso.get_Lasso_alphabet(4)==0 &&O.getStatus()==0 &&x==1){
+        O.revealAlph();
+        O.unpause();
+        }
+      A.resetAlph();S.resetAlph();T.resetAlph();L.resetAlph();
+    }
+
+    L.nextStep(stepTime);
+    A.nextStep(stepTime);
+    S.nextStep(stepTime);
+    T.nextStep(stepTime);
+    O.nextStep(stepTime);
+
+    lasso.nextStep(stepTime,lv,&lives);
+
+    coin.nextStep(stepTime);
+
+    //Restting alphabets after crossing the ground level
+    if(L.getYPos()>PLAY_Y_HEIGHT &&L.getStatus()==0) {
+      L.resetAlph();
+      x=(rand())%2;
+    }
+    if(A.getYPos()>PLAY_Y_HEIGHT &&A.getStatus()==0) {
+      A.resetAlph();
+      x=(rand())%2;
+    }
+    if(S.getYPos()>PLAY_Y_HEIGHT &&S.getStatus()==0) {
+      S.resetAlph();
+      x=(rand())%2;
+    }
+    if(T.getYPos()>PLAY_Y_HEIGHT &&T.getStatus()==0) {
+      T.resetAlph();
+      x=(rand())%2;
+    }
+    if(O.getYPos()>PLAY_Y_HEIGHT &&O.getStatus()==0) {
+      O.resetAlph();
+      x=(rand())%2;
+    }
+
+    if(coin.isPaused()) {
+      if((currTime-last_coin_jump_end) >= COIN_GAP) {
+	    coin.unpause();
+      }
+    }
+
+    //Resetting coins if they cross ground level
+    else if(coin.getYPos() > PLAY_Y_HEIGHT) {
+      if(coin.characteristic==2){
+        if(lasso.getNumCoins()>5)lasso.setNumCoins((4.0/5.0)*lasso.getNumCoins());
+        else lasso.decNumCoins();
+      }
+      int i =(rand())%8;
+      if(lv==1) i=0;
+      if(lv==2&&(i==2 || i==3)) i=0;
+      if(lv==3&& i==3) i=0;
+      if(lv==3&&remTime>5) i=2;
+      if(lv==4&&remTime>5) i=3;
+      coin.resetCoin(i,0);
+      x=(rand())%3;
+      last_coin_jump_end = currTime;
+    }
+
+    secondCoin.nextStep(stepTime);
+    if(secondCoin.isPaused()) {
+      if((currTime-last_coin_jump_end) >= COIN_GAP) {
+	    secondCoin.unpause();
+      }
+    }
+
+    else if(secondCoin.getYPos() > PLAY_Y_HEIGHT || secondCoin.getXPos() < PLAY_X_START) {
+      if(secondCoin.characteristic==2) {
+        if(lasso.getNumCoins()>5)lasso.setNumCoins((4.0/5.0)*lasso.getNumCoins());
+        else lasso.decNumCoins();
+      }
+      int i =(rand())%8;
+      if(lv==1) i=0;
+      if(lv==2&&(i==2||i==3)) i=0;
+      if(lv==3&&i==3) i=0;
+      if(lv==2 && remTime>5) i=1;
+      secondCoin.resetCoin(i,1);
+      x=(rand())%3;
+      last_coin_jump_end = currTime;
+    }
+
+
+    sprintf(coinScoreStr, "Coins: %d", lasso.getNumCoins());
+    coinScore.setMessage(coinScoreStr);
+
+    //Printing time remaining for a level
+    stepCount++;
+    currTime += stepTime;
+
+    remTime=lvTime-2*currTime + lvTime*(lv-1);
+    if(!victory)sprintf(timedisp,"Time: %d",remTime);
+    else sprintf(timedisp,"Time: -");
+    timer.setMessage(timedisp);
+
+    if(remTime<=0){
+      lv++;
+      x = (rand())%2;
+      if(lv<5) display(0,lv);
+      if(lv==5) display("Collect the letters !");
+      if(lv>5 && victory!=1) display("Level Up");
+    }
+    if(!victory) sprintf(leveldisp,"Level: %d",lv);
+    else sprintf(leveldisp,"Level: -");
+    level.setMessage(leveldisp);
+
+    if(lasso.getNumCoins()<0){
+    lives--;
+    display("Lost a life");
+    display(1,lives);
+    if(lasso.getNumCoins()==-2){
+      lives--;
+      display("Lost a life");
+      display(1,lives);
+    }
+    lasso.setNumCoins(0);
+    }
+
+    if(L.getStatus()==1) l_lasso.setFill(0);
+    if(A.getStatus()==1) a_lasso.setFill(0);
+    if(S.getStatus()==1) s1_lasso.setFill(0);
+    if(T.getStatus()==1) s2_lasso.setFill(0);
+    if(O.getStatus()==1) o_lasso.setFill(0);
+
+    if(L.getStatus()==1 && A.getStatus()==1 && S.getStatus()==1 && T.getStatus()==1 && O.getStatus()==1&&victory==0){
+      display("VICTORY");
+      display("Continue playing to increase your score !");
+      victory=1;
+      display_lasso.setColor(COLOR(255,0,0));
+    }
+
+    sprintf(livesdisp,"Lives: %d",lives);
+    current_lives.setMessage(livesdisp);
+
+    if(lives<=0) {
+      display(2,lasso.getNumCoins());
+      display("GAME OVER");
+      exit(0);
+    }
+
+    wait(stepTime);
+  } // End for(;;)
+
+  wait(3);
+} // End main_program
